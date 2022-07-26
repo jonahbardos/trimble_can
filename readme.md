@@ -1,3 +1,4 @@
 ## Current Working Version
-### windows/linux -> python trimble_can.py
-### mac -> python3 trimble_can.py 
+## Python must be 3.7 and above
+### windows -> python trimble_can.py
+### mac/linux -> python3 trimble_can.py 

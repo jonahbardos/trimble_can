@@ -12,7 +12,7 @@ DATABYTE_OFFSET = 1
 PGN_SPEED_DIR       = "18FEE8AA"
 PGN_SPEED_OFFSET    = 4
 PGN_DIR_OFFSET      = 4
-PGN_DIR_OFFSET_END  = 8
+PGN_SPEED_OFFSET_END  = 8
 
 # RESOLUTIONS
 VEHICLE_DIRECTION_RES = 1 / 128
@@ -65,10 +65,10 @@ class FindSpeedDirInLog:
                 "trans_rate": trans_rate,
                 "data_length": data_length,
                 "pgn": pgn,
-                "data_bytes": data_bytes,
                 "sender": sender,
-                "speed": self.get_machine_direction(data_bytes),
-                "direction": self.get_machine_speed(data_bytes),
+                "data_bytes": data_bytes,
+                "speedkm/h": self.get_machine_speed(data_bytes),
+                "dirDegrees": self.get_machine_direction(data_bytes),
             } 
             self.counter += 1
 
@@ -88,27 +88,33 @@ class FindSpeedDirInLog:
             return data_bytes
     
     def get_machine_direction(self, data_bytes: str) -> float:
-        dir_hex = data_bytes[PGN_DIR_OFFSET:PGN_DIR_OFFSET_END]
+        dir_hex = data_bytes[:PGN_DIR_OFFSET]
         val = self.convert_to_lil_endian(dir_hex)
         scale = VEHICLE_DIRECTION_RES
         offset = 0
         output = scale * val + offset
+        # output = val
         print("Machine Direction in degrees", output)
         return output
     
     def get_machine_speed(self, data_bytes: str) -> float:
-        speed_hex = data_bytes[:PGN_SPEED_OFFSET]
+        speed_hex = data_bytes[PGN_SPEED_OFFSET:PGN_SPEED_OFFSET_END]
         val = self.convert_to_lil_endian(speed_hex)
         scale = VEHICLE_SPEED_RES
         offset = 0
-        output = scale * val + offset
+        # output = scale * val + offset
+        rpm = 0.125 * val + offset
+        mm_tire = 0.250 # Assuming tire is 250 mm (SUV average)
+        output = 0.1885 * rpm * mm_tire # Formula to convert to kmh
         print("Machine speed in km/h", output)
         return output
     
     def convert_to_lil_endian(self, val: str) -> int:
         little_hex = bytearray.fromhex(val)
         little_hex.reverse()
+        
         str_little = ''.join(format(x, '02x') for x in little_hex)
+        print(val, "lil endian:", str_little)
         return int(str_little, 16)
 
     def get_total_found(self):
@@ -116,7 +122,7 @@ class FindSpeedDirInLog:
     
 
 if __name__ == "__main__":
-    # file_path = "test.log"
+    file_path = "test.log"
     file_path = "2020-12-03T22_30_35.121930_nav900.log"
     test = FindSpeedDirInLog(file_path)
     
