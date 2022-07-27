@@ -4,16 +4,30 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <ctime>
+#include <iomanip>
 
 using namespace std;
 #define max  2// define the max string  
 #define PGN_SPEED_DIR "18FEE8AA"
 string strings[max]; // define max string  
 
+// Offsets for slicing
+#define PGN_DIR_OFFSET       4
+#define PGN_SPEED_OFFSET 4
+#define PGN_SPEED_OFFSET_END   8
+
+int convertToLilEndianTwoBytes(string data_byte) {
+    string lsb = data_byte.substr(2, 2);
+    string msb = data_byte.substr(0,2);
+    string little_endian = lsb + msb;
+    // cout << "Old: " << data_byte << " New: " << little_endian << endl;
+    return stoi(little_endian, 0, 16);
+}
+
 void splitString(char str[]){
     char *ptr; // declare a ptr pointer  
     ptr = strtok(str, " "); // use strtok() function to separate string using comma (,) delimiter.  
-    cout << " \n Split string using strtok() function: " << endl;  
     // use while loop to check ptr is not null  
     while (ptr != NULL)  
     {  
@@ -53,20 +67,44 @@ void split (string str, char seperator)
         }     
 }
 
-void find_speed_dir_data_store(string canMsg, string dataBytes) {
-    cout << canMsg << ' ' << PGN_SPEED_DIR << endl;
+void get_machine_direction(string data_bytes){
+    string dir_hex = data_bytes.substr(0, PGN_DIR_OFFSET);
+    float scale = 1.0 / 128.0;
+    int data = convertToLilEndianTwoBytes(dir_hex);
+    float direction = scale * data;
+    cout << "Heading: " << direction << " Degrees" << endl;
+    // cout << "Machine Direction in degrees " << direction << endl;
+    // cout << "Machine Direction data " << data << endl;
+}
+
+void get_machine_speed(string dataBytes){
+    string speedHex = dataBytes.substr(PGN_SPEED_OFFSET, 4);
+    int data = convertToLilEndianTwoBytes(speedHex);
+    float rpm = 0.125 * data;
+    float mm_tire = 0.250;
+    float speed = 0.1885 * rpm * mm_tire;
+    cout << "Machine Speed: " << speed << " Km/h" << endl;
+    // cout << "Machine Speed data " << data << endl;
+}
+
+void find_speed_dir_data_store(string canMsg, string dataBytes, string timeEpoch) {
     if (canMsg == PGN_SPEED_DIR)
     {
         cout << canMsg << ' ' << PGN_SPEED_DIR << endl;
+        cout << dataBytes << " data bytes"<< endl;
+        time_t datetime = stod(timeEpoch);
+        cout << "Time: " << put_time(localtime(&datetime), "%H:%M") << endl;
+        get_machine_direction(dataBytes);
+        get_machine_speed(dataBytes);
     }
 }
 
-void extractDatapacket(string str) {
+void extractDatapacket(string str, string timeEpoch) {
     char seperator = '#';
     split(str, seperator);
     string data1 = strings[0]; // Contains pgn
     string data2 = strings[1]; // Data bytes
-    find_speed_dir_data_store(data1, data2);
+    find_speed_dir_data_store(data1, data2, timeEpoch);
     // cout <<" The split string is: ";  
     // for (int i = 0; i < max; i++)  
     // {  
@@ -78,18 +116,19 @@ void splitStringPython(char str[]) {
     vector<string> g1;
     char *ptr; // declare a ptr pointer  
     ptr = strtok(str, " "); // use strtok() function to separate string using comma (,) delimiter.  
-    cout << "Split string using strtok() function: " << endl; 
     while (ptr != NULL)  
     {  
         g1.push_back(ptr);
         ptr = strtok (NULL, " , ");  
     } 
 
-    string time_epoch = g1.at(0);
+    string time_epoch = g1.at(0).substr(1, g1.at(0).size() -2);
     string bus_channel = g1.at(1);
     string data_packet = g1.at(2);
-    extractDatapacket(data_packet);
-    // cout << g1.at(2) << endl; 
+    
+    extractDatapacket(data_packet, time_epoch);
+   
+    // cout << datetime<< endl; 
     // cout << "\nVector elements are: ";
     // for (auto it = g1.begin(); it != g1.end(); it++)
     //     cout << *it << " ";
@@ -104,25 +143,24 @@ void testSplitString(){
     splitStringPython(char_array);
 }
 
+void testSplitStringV2(string s){
+    int n = s.length();
+    char char_array[50];
+    strcpy(char_array, s.c_str());
+    splitStringPython(char_array);
+}
+
 int main() {
-    // // Read logs
-    // char filename[50];
-    // ifstream fileObj;
-    // cin.getline(filename, 50);
-    // fileObj.open(filename);
-    // if (!fileObj.is_open()) {
-    //     exit(EXIT_FAILURE);
-    // }
-
-    // char line[50];
-    // fileObj >> line;
-    // while(fileObj.good()) {
-    //     cout << line << "\n";
-    //     fileObj >> line;
-    // }
-
-    // testSplitString();
-    testSplitString();
+    // Read logs
+    // ifstream file("test.log");
+    ifstream file("2020-12-03T22_30_35.121930_nav900.log");
+    if (file.is_open()) {
+        string line;
+        while (getline(file, line)) {
+            testSplitStringV2(line.c_str());
+        }
+        file.close();
+    }
 
     return 0;
 }
